@@ -13,7 +13,7 @@ import ReduxProvider from "@/providers/redux";
 // };
 
 export const metadata: Metadata = {
-  title: "Marketing Systems",
+  title: "Management Systems",
   description:
     "Solusi cerdas untuk mempermudah manajemen dan pemantauan penjualan secara efisien.",
   icons: {

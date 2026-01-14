@@ -1,19 +1,23 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
+  IconCalendarStats,
   IconDashboard,
-  IconDatabase,
+  IconDeviceDesktopCog,
+  IconDevicesCog,
   IconReport,
+  IconReportMoney,
   IconSettings,
-  IconFileNeutral,
-  IconBuildingStore,
+  IconSettingsUp,
+  IconShieldUp,
   IconUsersGroup,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
+import { useSession } from "next-auth/react";
 
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -22,47 +26,45 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import Image from "next/image"
+} from "@/components/ui/sidebar";
+import Image from "next/image";
 
-const data = {
-  user: {
-    name: "Marketing Systems",
-    email: "superadmin@gmail.com",
-    avatar: "/icon-marketing.png",
-  },
+const NAV_DATA = {
   navMain: [
     {
       title: "Dashboard",
-      url: "/dashboard/superadmin",
+      url: "/dashboard",
       icon: IconDashboard,
     },
     {
-      title: "Manajemen Programmer",
-      url: "/programmer-management",
-      icon: IconUsersGroup,
-    },
-    {
-      title: "Manajemen Product IT",
-      url: "/product-management",
-      icon: IconFileNeutral,
-    },
-    {
-      title: "Manajemen Marketing",
-      url: "/marketing-management",
-      icon: IconBuildingStore,
+      title: "Manajemen",
+      url: "#",
+      icon: IconDeviceDesktopCog,
       children: [
         {
-          title: "Data Marketing",
-          url: "/marketing-management/data-marketing",
+          title: "Program Kerja",
+          url: "/management/program-kerja",
+          icon: IconDevicesCog,
         },
         {
-          title: "Transaksi Product",
-          url: "/marketing-management/transaksi-product",
+          title: "Inisiatif Strategis",
+          url: "/management/inisiatif-strategis",
+          icon: IconCalendarStats,
         },
         {
-          title: "Transaksi Jasa",
-          url: "/marketing-management/transaksi-jasa",
+          title: "Anggaran",
+          url: "/management/anggaran",
+          icon: IconReportMoney,
+        },
+        {
+          title: "Manajemen Resiko",
+          url: "/management/resiko",
+          icon: IconShieldUp,
+        },
+        {
+          title: "Manajemen Isu",
+          url: "/management/isu",
+          icon: IconSettingsUp,
         },
       ],
     },
@@ -70,17 +72,6 @@ const data = {
       title: "Reports",
       url: "/reports",
       icon: IconReport,
-    },
-    {
-      title: "Master",
-      url: "/master",
-      icon: IconDatabase,
-      children: [
-        {
-          title: "Skills Category",
-          url: "/skills-category",
-        },
-      ],
     },
   ],
   navSecondary: [
@@ -90,10 +81,17 @@ const data = {
       icon: IconSettings,
     },
   ],
-  documents: [],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession();
+
+  const userData = {
+    name: session?.user?.name || "Guest",
+    email: session?.user?.email || "No Email",
+    avatar: session?.user?.image || "/icon-marketing.png",
+  };
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -104,20 +102,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
               <a href="#">
-                <Image src="/icon-marketing.png" alt="Marketing Systems" width={32} height={32} />
-                <span className="text-base font-semibold">Marketing Systems</span>
+                <Image
+                  src="/icon-marketing.png"
+                  alt="Marketing Systems"
+                  width={32}
+                  height={32}
+                />
+                <span className="text-base font-semibold">
+                  Management Systems
+                </span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={NAV_DATA.navMain} />
+        <NavSecondary items={NAV_DATA.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
