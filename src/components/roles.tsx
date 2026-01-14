@@ -16,7 +16,7 @@ import {
 import { IconDotsVertical } from "@tabler/icons-react";
 import { Role } from "@/types/user";
 import { Button } from "@/components/ui/button"; 
-import FormCreateRole from "@/components/formModal/form-create-role"; 
+import FormCreateRole from "./form-modal/form-create-role";
 import Swal from "sweetalert2";
 
 export default function RolePage() {

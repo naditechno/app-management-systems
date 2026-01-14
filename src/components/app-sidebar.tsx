@@ -11,7 +11,9 @@ import {
   IconSettings,
   IconSettingsUp,
   IconShieldUp,
-  IconUsersGroup,
+  IconUserCog,
+  IconUsers,
+  IconUserScan,
 } from "@tabler/icons-react";
 import { useSession } from "next-auth/react";
 
@@ -72,6 +74,23 @@ const NAV_DATA = {
       title: "Reports",
       url: "/reports",
       icon: IconReport,
+    },
+    {
+      title: "Manajemen User",
+      url: "#",
+      icon: IconUserCog,
+      children: [
+        {
+          title: "Manajemen User",
+          url: "/users-management",
+          icon: IconUsers,
+        },
+        {
+          title: "Manajemen Role",
+          url: "/users-management/roles-permissions",
+          icon: IconUserScan,
+        },
+      ],
     },
   ],
   navSecondary: [

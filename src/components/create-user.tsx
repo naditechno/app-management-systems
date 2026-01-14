@@ -5,18 +5,20 @@ import {
   useGetRolesQuery,
   useGetUsersQuery,
   useUpdateUserStatusMutation,
+  useValidateUserEmailMutation,
 } from "@/services/users.service";
-import FormCreateUser from "@/components/formModal/form-create-user";
+import FormCreateUser from "./form-modal/form-create-user";
+import FormUpdatePassword from "./form-modal/form-update-password";
 import useModal from "@/hooks/use-modal";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { IconDotsVertical } from "@tabler/icons-react";
+import { IconDotsVertical, IconKey, IconMailCheck } from "@tabler/icons-react";
 import { User } from "@/types/user";
-import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import Swal from "sweetalert2";
 
@@ -29,6 +31,10 @@ export default function CreateUser() {
   const [editingUser, setEditingUser] = useState<User | undefined>(undefined);
   const [usersPerPage] = useState(10);
 
+  // ✅ State khusus untuk Modal Ubah Password
+  const [passwordModalUser, setPasswordModalUser] = useState<User | null>(null);
+
+  // --- API HOOKS ---
   const {
     data: result,
     isLoading,
@@ -44,13 +50,20 @@ export default function CreateUser() {
   const { data: roles = [] } = useGetRolesQuery();
   const [deleteUser] = useDeleteUserMutation();
   const [updateUserStatus] = useUpdateUserStatusMutation();
+
+  // New Mutations
+  const [validateEmail] = useValidateUserEmailMutation();
+
+  // Modal untuk Create/Edit User (Bukan Password)
   const { isOpen, openModal, closeModal } = useModal();
 
   const users: User[] = result?.data?.data || [];
   const totalPages = result?.data?.last_page || 1;
 
+  // --- HANDLERS ---
+
   const handleAddUser = () => {
-    setEditingUser(undefined); // reset
+    setEditingUser(undefined);
     openModal();
   };
 
@@ -79,13 +92,13 @@ export default function CreateUser() {
         Swal.fire("Error", "Terjadi kesalahan saat menghapus user.", "error");
       }
     }
-  };  
+  };
 
   const toggleStatus = async (user: User) => {
     const action = user.status ? "Nonaktifkan" : "Aktifkan";
-
     const result = await Swal.fire({
       title: `${action} ${user.name}?`,
+      text: `Apakah Anda yakin ingin me-${action.toLowerCase()} user ini?`,
       icon: "question",
       showCancelButton: true,
       confirmButtonText: action,
@@ -113,7 +126,34 @@ export default function CreateUser() {
         Swal.fire("Error", "Gagal mengubah status user.", "error");
       }
     }
-  };  
+  };
+
+  // ✅ Handler: Buka Modal Password
+  const handleOpenPasswordModal = (user: User) => {
+    setPasswordModalUser(user);
+  };
+
+  // ✅ Handler: Validasi Email
+  const handleValidateEmail = async (user: User) => {
+    const result = await Swal.fire({
+      title: "Validasi Email?",
+      text: `Kirim validasi email untuk ${user.email}?`,
+      icon: "info",
+      showCancelButton: true,
+      confirmButtonText: "Ya, Validasi",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await validateEmail(user.id).unwrap();
+        Swal.fire("Berhasil!", "Email user berhasil divalidasi.", "success");
+      } catch (err: unknown) {
+        console.error(err);
+        Swal.fire("Error", "Gagal memvalidasi email.", "error");
+      }
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -155,20 +195,21 @@ export default function CreateUser() {
               <option value="">Semua Peran</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.name}>
-                  {role.name.charAt(0).toUpperCase() + role.name.slice(1)}
+                  {role.name}
                 </option>
               ))}
             </select>
 
             <button
               onClick={handleAddUser}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white rounded-md shadow hover:bg-primary/90 transition"
+              className="px-4 py-2 text-sm bg-primary text-white rounded-md"
             >
               Tambah Akun
             </button>
           </div>
         </div>
 
+        {/* Table Section */}
         <div className="bg-white dark:bg-neutral-800 shadow rounded overflow-auto">
           {isLoading ? (
             <p className="text-center animate-pulse py-6">
@@ -181,29 +222,30 @@ export default function CreateUser() {
               <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-100 dark:bg-neutral-700">
                   <tr>
-                    {"No Nama Email Telepon Peran Status Aksi"
-                      .split(" ")
-                      .map((h) => (
-                        <th
-                          key={h}
-                          className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-300"
-                        >
-                          {h}
-                        </th>
-                      ))}
+                    {"No Nama Email Telepon Peran Aksi".split(" ").map((h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-300"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {users
                     .filter((u) => {
+                      // Logic Filter Status
                       const matchStatus =
                         statusFilter === "" ||
                         (statusFilter === "active" ? u.status : !u.status);
 
+                      // Logic Filter Role
+                      const userRoleName =
+                        u.role_name || u.roles?.[0]?.name || "";
                       const matchRole =
                         roleFilter === "" ||
-                        (u.roles?.[0]?.name?.toLowerCase() || "") ===
-                          roleFilter.toLowerCase();
+                        userRoleName.toLowerCase() === roleFilter.toLowerCase();
 
                       return matchStatus && matchRole;
                     })
@@ -215,14 +257,7 @@ export default function CreateUser() {
                         <td className="px-4 py-2">{u.name}</td>
                         <td className="px-4 py-2">{u.email}</td>
                         <td className="px-4 py-2">{u.phone}</td>
-                        <td className="px-4 py-2 capitalize">
-                          {u.roles?.[0]?.name || "-"}
-                        </td>
-                        <td className="px-4 py-2">
-                          <Badge variant={u.status ? "success" : "destructive"}>
-                            {u.status ? "Aktif" : "Tidak Aktif"}
-                          </Badge>
-                        </td>
+                        <td className="px-4 py-2">{u.role_name}</td>
                         <td className="px-4 py-2 flex items-center gap-2">
                           <Button
                             variant="default"
@@ -238,6 +273,8 @@ export default function CreateUser() {
                           >
                             Delete
                           </Button>
+
+                          {/* DROPDOWN MENU */}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <button className="p-1 rounded hover:bg-gray-200 dark:hover:bg-neutral-700">
@@ -245,21 +282,33 @@ export default function CreateUser() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              {u.status ? (
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={() => toggleStatus(u)}
-                                >
-                                  Nonaktifkan
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  className="text-green-600"
-                                  onClick={() => toggleStatus(u)}
-                                >
-                                  Aktifkan
-                                </DropdownMenuItem>
-                              )}
+                              {/* 1. Update Password */}
+                              <DropdownMenuItem
+                                onClick={() => handleOpenPasswordModal(u)}
+                              >
+                                <IconKey className="w-4 h-4 mr-2" />
+                                Ubah Password
+                              </DropdownMenuItem>
+
+                              {/* 2. Validate Email */}
+                              <DropdownMenuItem
+                                onClick={() => handleValidateEmail(u)}
+                              >
+                                <IconMailCheck className="w-4 h-4 mr-2" />
+                                Validasi Email
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator />
+
+                              {/* 3. Status Toggle */}
+                              <DropdownMenuItem
+                                className={
+                                  u.status ? "text-red-600" : "text-green-600"
+                                }
+                                onClick={() => toggleStatus(u)}
+                              >
+                                {u.status ? "Nonaktifkan" : "Aktifkan"}
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
@@ -268,26 +317,23 @@ export default function CreateUser() {
                 </tbody>
               </table>
 
+              {/* Pagination UI */}
               <div className="flex justify-between items-center p-4 bg-neutral-100 dark:bg-neutral-700">
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Halaman {currentPage} dari {totalPages}
-                </p>
+                <p>Halaman {currentPage}</p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                    onClick={() => setCurrentPage((p) => p - 1)}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 text-sm bg-gray-300 dark:bg-neutral-600 text-black dark:text-white rounded disabled:opacity-50"
+                    className="px-3 py-1 bg-gray-200 dark:bg-neutral-700 rounded disabled:opacity-50"
                   >
-                    Sebelumnya
+                    Prev
                   </button>
                   <button
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(p + 1, totalPages))
-                    }
+                    onClick={() => setCurrentPage((p) => p + 1)}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 text-sm bg-gray-300 dark:bg-neutral-600 text-black dark:text-white rounded disabled:opacity-50"
+                    className="px-3 py-1 bg-gray-200 dark:bg-neutral-700 rounded disabled:opacity-50"
                   >
-                    Selanjutnya
+                    Next
                   </button>
                 </div>
               </div>
@@ -296,11 +342,23 @@ export default function CreateUser() {
         </div>
       </section>
 
+      {/* MODAL Create/Edit User */}
       {isOpen && (
         <FormCreateUser
           onClose={closeModal}
           onSuccess={refetch}
           initialData={editingUser ?? undefined}
+        />
+      )}
+
+      {/* MODAL Ubah Password */}
+      {passwordModalUser && (
+        <FormUpdatePassword
+          user={passwordModalUser}
+          onClose={() => setPasswordModalUser(null)}
+          onSuccess={() => {
+            // Opsional: refetch jika perlu
+          }}
         />
       )}
     </main>

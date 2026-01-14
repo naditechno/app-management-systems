@@ -6,6 +6,7 @@ export interface User {
   phone: string;
   status: number;
   roles: { id: number; name: string }[];
+  role_name: string;
 }
 
 export interface CreateUserPayload {
@@ -33,4 +34,16 @@ export interface FormCreateRoleProps {
   roleName: string;
   setRoleName: (name: string) => void;
   isSubmitting: boolean;
+}
+
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface ForgotPasswordPayload {
+  email: string;
 }
