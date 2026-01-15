@@ -137,7 +137,7 @@ export default function ProgramRiskFormPage() {
         Swal.fire("Berhasil", "Risiko berhasil dibuat", "success");
       }
       router.push("/management/resiko");
-    }  (error: unknown) {
+    } catch (error: unknown) {
       console.error(error);
 
       const errorMessage = getErrorMessage(error);
@@ -168,7 +168,7 @@ export default function ProgramRiskFormPage() {
         <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-[1000px] mx-auto w-full">
           <div className="flex items-center gap-4">
             <Button
-       catch       variant="outline"
+              variant="outline"
               size="sm"
               onClick={() => router.back()}
               className="gap-2 bg-white"
