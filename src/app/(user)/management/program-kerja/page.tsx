@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export default function WorkProgramPage() {
   const router = useRouter();
@@ -86,9 +87,16 @@ export default function WorkProgramPage() {
       try {
         await deleteProgram(id).unwrap();
         Swal.fire("Terhapus!", "Program telah dihapus.", "success");
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        Swal.fire("Gagal!", "Terjadi kesalahan saat menghapus.", "error");
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };

@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   // IconCreditCard,
@@ -6,13 +6,9 @@ import {
   IconLogout,
   // IconNotification,
   // IconUserCircle,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,27 +17,28 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { useLogoutMutation } from "@/services/auth.service"
-import { signOut } from "next-auth/react"
+} from "@/components/ui/sidebar";
+import { useLogoutMutation } from "@/services/auth.service";
+import { signOut } from "next-auth/react";
 import Swal from "sweetalert2";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export function NavUser({
   user,
 }: {
   user: {
-    name: string
-    email: string
-    avatar: string
-  }
+    name: string;
+    email: string;
+    avatar: string;
+  };
 }) {
-  const { isMobile } = useSidebar()
+  const { isMobile } = useSidebar();
   const [logout, { isLoading }] = useLogoutMutation();
 
   const handleLogout = async () => {
@@ -58,12 +55,19 @@ export function NavUser({
       try {
         await logout().unwrap();
         await signOut({ callbackUrl: "/login" });
-      } catch (error) {
-        console.error("Gagal logout:", error);
-        Swal.fire("Gagal", "Terjadi kesalahan saat logout.", "error");
+      } catch (error: unknown) {
+        console.error(error);
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
-  };  
+  };
 
   return (
     <SidebarMenu>

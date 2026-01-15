@@ -21,6 +21,7 @@ import { IconDotsVertical, IconKey, IconMailCheck } from "@tabler/icons-react";
 import { User } from "@/types/user";
 import { Button } from "./ui/button";
 import Swal from "sweetalert2";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export default function CreateUser() {
   const [currentPage, setCurrentPage] = useState(1);
@@ -87,9 +88,16 @@ export default function CreateUser() {
         await deleteUser(user.id).unwrap();
         Swal.fire("Berhasil!", "User berhasil dihapus.", "success");
         refetch();
-      } catch (err) {
-        console.error("Gagal menghapus:", err);
-        Swal.fire("Error", "Terjadi kesalahan saat menghapus user.", "error");
+      } catch (error: unknown) {
+        console.error(error);
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };
@@ -121,9 +129,16 @@ export default function CreateUser() {
           "success"
         );
         refetch();
-      } catch (error) {
-        console.error("Gagal ubah status:", error);
-        Swal.fire("Error", "Gagal mengubah status user.", "error");
+      } catch (error: unknown) {
+        console.error(error);
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };

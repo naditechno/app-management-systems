@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getErrorMessage } from "@/lib/error-utils";
 
 // Schema Validation
 const initiativeSchema = z.object({
@@ -171,9 +172,16 @@ export default function CreateInitiativePage() {
         Swal.fire("Berhasil", "Inisiatif berhasil dibuat", "success");
       }
       router.push("/management/inisiatif-strategis");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      Swal.fire("Gagal", "Terjadi kesalahan saat menyimpan data", "error");
+
+      const errorMessage = getErrorMessage(error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: errorMessage,
+      });
     }
   };
 

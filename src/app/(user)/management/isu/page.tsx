@@ -51,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export default function IssueManagementPage() {
   const router = useRouter();
@@ -149,9 +150,16 @@ export default function IssueManagementPage() {
       try {
         await deleteIssue(id).unwrap();
         Swal.fire("Terhapus!", "Isu telah dihapus.", "success");
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        Swal.fire("Gagal!", "Terjadi kesalahan saat menghapus.", "error");
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };
@@ -185,9 +193,7 @@ export default function IssueManagementPage() {
             </div>
             <Button
               className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={() =>
-                router.push("/management/isu/add-data")
-              }
+              onClick={() => router.push("/management/isu/add-data")}
             >
               <Plus className="mr-2 h-4 w-4" /> Tambah Isu
             </Button>
@@ -241,9 +247,7 @@ export default function IssueManagementPage() {
             {/* Selesai / Resolved */}
             <Card className="shadow-sm">
               <CardContent className="p-6">
-                <p className="text-sm font-medium text-slate-500">
-                  Selesai
-                </p>
+                <p className="text-sm font-medium text-slate-500">Selesai</p>
                 <div className="flex items-center gap-2 mt-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <h3 className="text-3xl font-bold text-green-600">

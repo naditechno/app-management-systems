@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export default function StrategicInitiativePage() {
   const router = useRouter();
@@ -84,9 +85,16 @@ export default function StrategicInitiativePage() {
       try {
         await deleteInitiative(id).unwrap();
         Swal.fire("Terhapus!", "Inisiatif telah dihapus.", "success");
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        Swal.fire("Gagal!", "Terjadi kesalahan saat menghapus.", "error");
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };

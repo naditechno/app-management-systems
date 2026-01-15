@@ -4,6 +4,7 @@ import { useUpdateUserPasswordMutation } from "@/services/users.service";
 import { User } from "@/types/user";
 import Swal from "sweetalert2";
 import { IconEye, IconEyeOff, IconLock } from "@tabler/icons-react";
+import { getErrorMessage } from "@/lib/error-utils";
 
 interface FormUpdatePasswordProps {
   user: User;
@@ -56,9 +57,16 @@ export default function FormUpdatePassword({
 
       onSuccess();
       onClose();
-    } catch (err) {
-      console.error(err);
-      Swal.fire("Error", "Gagal memperbarui password.", "error");
+    } catch (error: unknown) {
+      console.error(error);
+
+      const errorMessage = getErrorMessage(error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: errorMessage,
+      });
     }
   };
 

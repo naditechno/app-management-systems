@@ -1,16 +1,10 @@
-'use client';
+"use client";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Swal from "sweetalert2";
-import {
-  Loader2,
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-} from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Search } from "lucide-react";
 
 // RTK Query Hooks
 import {
@@ -58,6 +52,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getErrorMessage } from "@/lib/error-utils";
 
 // --- Schema Validasi ---
 const formSchema = z.object({
@@ -142,12 +137,15 @@ export default function DivisionsPage() {
       }
       setIsModalOpen(false);
       form.reset();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
+
+      const errorMessage = getErrorMessage(error);
+
       Swal.fire({
         icon: "error",
-        title: "Error",
-        text: "Something went wrong. Please try again.",
+        title: "Gagal",
+        text: errorMessage,
       });
     }
   };
@@ -173,12 +171,15 @@ export default function DivisionsPage() {
           timer: 1500,
           showConfirmButton: false,
         });
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
+
+        const errorMessage = getErrorMessage(error);
+
         Swal.fire({
-          title: "Error!",
-          text: "Failed to delete division.",
           icon: "error",
+          title: "Gagal",
+          text: errorMessage,
         });
       }
     }

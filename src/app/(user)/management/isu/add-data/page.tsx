@@ -38,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getErrorMessage } from "@/lib/error-utils";
 
 // --- VALIDATION SCHEMA ---
 const issueSchema = z.object({
@@ -148,10 +149,17 @@ export default function ProgramIssueFormPage() {
         Swal.fire("Berhasil", "Isu berhasil dibuat", "success");
       }
       router.push("/management/isu");
-    } catch (error) {
-      console.error(error);
-      Swal.fire("Gagal", "Terjadi kesalahan saat menyimpan", "error");
-    }
+    } catch (error: unknown) {
+          console.error(error);
+    
+          const errorMessage = getErrorMessage(error);
+    
+          Swal.fire({
+            icon: "error",
+            title: "Gagal",
+            text: errorMessage,
+          });
+        }
   };
 
   const programs = programsData?.data?.data || [];

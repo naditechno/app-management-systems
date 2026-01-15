@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { IconDotsVertical } from "@tabler/icons-react";
 import { Role } from "@/types/user";
-import { Button } from "@/components/ui/button"; 
+import { Button } from "@/components/ui/button";
 import FormCreateRole from "./form-modal/form-create-role";
 import Swal from "sweetalert2";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export default function RolePage() {
   const [search, setSearch] = useState("");
@@ -71,9 +72,16 @@ export default function RolePage() {
         await deleteRole(role.id).unwrap();
         await Swal.fire("Berhasil", "Peran berhasil dihapus", "success");
         refetch(); // Memuat ulang data setelah penghapusan
-      } catch (err) {
-        console.error("Gagal menghapus peran:", err);
-        Swal.fire("Gagal", "Terjadi kesalahan saat menghapus peran", "error");
+      } catch (error: unknown) {
+        console.error(error);
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };
@@ -95,11 +103,18 @@ export default function RolePage() {
       }
       refetch();
       closeModal();
-    } catch (error) {
-      console.error("Gagal menyimpan peran:", error);
-      Swal.fire("Gagal", "Terjadi kesalahan saat menyimpan peran", "error");
+    } catch (error: unknown) {
+      console.error(error);
+
+      const errorMessage = getErrorMessage(error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Gagal",
+        text: errorMessage,
+      });
     }
-  };  
+  };
 
   return (
     <main className="p-6 w-full mx-auto">

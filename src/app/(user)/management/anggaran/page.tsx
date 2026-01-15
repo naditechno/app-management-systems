@@ -49,6 +49,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { getErrorMessage } from "@/lib/error-utils";
 
 export default function ProgramTaskPage() {
   const router = useRouter();
@@ -124,9 +125,16 @@ export default function ProgramTaskPage() {
       try {
         await deleteTask(id).unwrap();
         Swal.fire("Terhapus!", "Task telah dihapus.", "success");
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(error);
-        Swal.fire("Gagal!", "Terjadi kesalahan saat menghapus.", "error");
+
+        const errorMessage = getErrorMessage(error);
+
+        Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: errorMessage,
+        });
       }
     }
   };
@@ -154,9 +162,7 @@ export default function ProgramTaskPage() {
               </p>
             </div>
             <Button
-              onClick={() =>
-                router.push("/management/anggaran/add-data")
-              }
+              onClick={() => router.push("/management/anggaran/add-data")}
               className="bg-[#0F172A] hover:bg-[#1E293B] text-white"
             >
               <Plus className="mr-2 h-4 w-4" /> Tambah Anggaran
