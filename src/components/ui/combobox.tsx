@@ -12,7 +12,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ComboboxProps<T extends { id: number }> {
   value: number | null;
@@ -22,6 +23,7 @@ interface ComboboxProps<T extends { id: number }> {
   isLoading?: boolean;
   placeholder?: string;
   getOptionLabel?: (item: T) => string;
+  disabled?: boolean;
 }
 
 export function Combobox<T extends { id: number }>({
@@ -32,19 +34,20 @@ export function Combobox<T extends { id: number }>({
   isLoading,
   placeholder = "Pilih Data",
   getOptionLabel,
+  disabled,
 }: ComboboxProps<T>) {
   const [open, setOpen] = React.useState(false);
 
   const selected = data.find((item) => item.id === value);
 
   const defaultOptionLabel = (item: T) => {
-    if ("name" in item && "email" in item) {
-      return `${(item as { name: string; email: string }).name} (${
-        (item as { name: string; email: string }).email
-      })`;
+    if ("name" in item) {
+      return (item as unknown as { name: string }).name;
     }
     return `ID: ${item.id}`;
   };
+
+  const labelFetcher = getOptionLabel ?? defaultOptionLabel;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -52,19 +55,20 @@ export function Combobox<T extends { id: number }>({
         <Button
           variant="outline"
           role="combobox"
-          className="justify-between w-full"
+          aria-expanded={open}
+          className="justify-between w-full font-normal"
+          disabled={disabled}
         >
-          {selected
-            ? (getOptionLabel ?? defaultOptionLabel)(selected)
-            : placeholder}
+          {selected ? labelFetcher(selected) : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
+      <PopoverContent className="w-full p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
             placeholder="Cari..."
             onValueChange={(value) => {
-              if (value.length >= 2 && onSearchChange) {
+              if (onSearchChange) {
                 onSearchChange(value);
               }
             }}
@@ -75,7 +79,9 @@ export function Combobox<T extends { id: number }>({
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat...
               </CommandItem>
             )}
-            <CommandEmpty>Tidak ditemukan</CommandEmpty>
+            {!isLoading && data.length === 0 && (
+              <CommandEmpty>Tidak ditemukan</CommandEmpty>
+            )}
             {data.map((item) => (
               <CommandItem
                 key={item.id}
@@ -85,7 +91,13 @@ export function Combobox<T extends { id: number }>({
                   setOpen(false);
                 }}
               >
-                {(getOptionLabel ?? defaultOptionLabel)(item)}
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    value === item.id ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                {labelFetcher(item)}
               </CommandItem>
             ))}
           </CommandList>

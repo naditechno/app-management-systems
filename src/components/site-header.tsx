@@ -97,7 +97,7 @@ export function SiteHeader({ title }: { title: string }) {
       items: NavItem[],
       targetUrl: string
     ): NavItem[] | null => {
-      let bestMatch: NavItem[] | null = null;
+      const bestMatch: NavItem[] | null = null;
 
       for (const item of items) {
         // Skip URL root atau hash

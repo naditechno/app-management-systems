@@ -1,13 +1,38 @@
 "use client";
 
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  AlertCircle,
+  Clock,
+  PlayCircle,
+  AlertTriangle,
+  Loader2,
+  Search,
+  CheckCircle2,
+  CalendarDays,
+} from "lucide-react";
+
+// RTK Query Hooks
+import {
+  useGetProgramIssuesQuery,
+  useDeleteProgramIssueMutation,
+} from "@/services/management/program-issue.service";
+import { useGetProgramsQuery } from "@/services/management/program.service";
+
+// Components
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Table,
@@ -18,75 +43,126 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  AlertCircle,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  PlayCircle,
-} from "lucide-react";
-
-// --- MOCK DATA ---
-const issues = [
-  {
-    id: 1,
-    program: "Digital Banking Transformation",
-    description: "Sistem mengalami downtime selama 2 jam pada jam sibuk",
-    note: "Perlu Eskalasi",
-    tanggal: "25/11/2024",
-    status: "Terbuka",
-    pic: "IT Operations",
-    durasi: 220, // hari (mock data sesuai gambar)
-  },
-  {
-    id: 2,
-    program: "Customer Experience Enhancement",
-    description: "Komplain nasabah meningkat 30% terkait kesulitan login",
-    note: "",
-    tanggal: "28/11/2024",
-    status: "Dalam Proses",
-    pic: "Digital Banking",
-    durasi: 217,
-  },
-  {
-    id: 3,
-    program: "Risk Management System",
-    description: "Data integrasi dengan sistem legacy tidak sinkron",
-    note: "",
-    tanggal: "01/12/2024",
-    status: "Selesai",
-    pic: "Risk Management",
-    durasi: 214,
-  },
-  {
-    id: 4,
-    program: "Mobile Banking Upgrade",
-    description: "Fitur biometric authentication tidak berfungsi pada iOS 18",
-    note: "",
-    tanggal: "03/12/2024",
-    status: "Dalam Proses",
-    pic: "Mobile Development",
-    durasi: 212,
-  },
-];
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function IssueManagementPage() {
-  // Helper Warna Status
-  const getStatusBadge = (status: string) => {
+  const router = useRouter();
+
+  // State
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [selectedProgram, setSelectedProgram] = useState<string>("all");
+
+  // Fetch Programs for Filter
+  const { data: programsData } = useGetProgramsQuery({
+    page: 1,
+    paginate: 100,
+  });
+
+  // Fetch Issues
+  const {
+    data: issuesData,
+    isLoading,
+    isFetching,
+  } = useGetProgramIssuesQuery({
+    page,
+    paginate: 10,
+    search,
+    program_id: selectedProgram !== "all" ? Number(selectedProgram) : undefined,
+  });
+
+  const [deleteIssue] = useDeleteProgramIssueMutation();
+
+  const issues = issuesData?.data?.data || [];
+  const lastPage = issuesData?.data?.last_page || 1;
+  const programs = programsData?.data?.data || [];
+
+  // Helper Warna Status (Integer Mapping)
+  const getStatusBadge = (status: number) => {
     switch (status) {
-      case "Terbuka":
-        return "bg-red-100 text-red-700 hover:bg-red-200 border-red-200";
-      case "Dalam Proses":
-        return "bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200";
-      case "Selesai":
-        return "bg-green-100 text-green-700 hover:bg-green-200 border-green-200";
+      case 0: // OPEN
+        return (
+          <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-red-200 font-medium">
+            Terbuka
+          </Badge>
+        );
+      case 1: // IN_PROGRESS
+        return (
+          <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 font-medium">
+            Dalam Proses
+          </Badge>
+        );
+      case 2: // RESOLVED
+        return (
+          <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200 font-medium">
+            Selesai
+          </Badge>
+        );
+      case 3: // CLOSED
+        return (
+          <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200 font-medium">
+            Ditutup
+          </Badge>
+        );
       default:
-        return "bg-gray-100 text-gray-700";
+        return <Badge variant="outline">Unknown</Badge>;
     }
   };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  // Hitung Durasi (Dummy Logic: Selisih hari ini dengan created_at)
+  const calculateDuration = (dateString: string) => {
+    const start = new Date(dateString).getTime();
+    const end = new Date().getTime();
+    const diff = Math.ceil((end - start) / (1000 * 3600 * 24));
+    return diff;
+  };
+
+  // Handler Delete
+  const handleDelete = async (id: number) => {
+    const result = await Swal.fire({
+      title: "Apakah anda yakin?",
+      text: "Data isu yang dihapus tidak dapat dikembalikan!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteIssue(id).unwrap();
+        Swal.fire("Terhapus!", "Isu telah dihapus.", "success");
+      } catch (error) {
+        console.error(error);
+        Swal.fire("Gagal!", "Terjadi kesalahan saat menghapus.", "error");
+      }
+    }
+  };
+
+  // Stats Calculation (Client Side)
+  const totalIssues = issuesData?.data?.total || 0;
+  const openIssues = issues.filter((i) => i.status === 0).length;
+  const progressIssues = issues.filter((i) => i.status === 1).length;
+  const resolvedIssues = issues.filter(
+    (i) => i.status === 2 || i.status === 3
+  ).length;
 
   return (
     <>
@@ -107,7 +183,12 @@ export default function IssueManagementPage() {
                 </p>
               </div>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() =>
+                router.push("/management/isu/add-data")
+              }
+            >
               <Plus className="mr-2 h-4 w-4" /> Tambah Isu
             </Button>
           </div>
@@ -120,7 +201,9 @@ export default function IssueManagementPage() {
                 <p className="text-sm font-medium text-slate-500">Total Isu</p>
                 <div className="flex items-center gap-2 mt-2">
                   <Clock className="h-5 w-5 text-slate-400" />
-                  <h3 className="text-3xl font-bold text-slate-800">4</h3>
+                  <h3 className="text-3xl font-bold text-slate-800">
+                    {totalIssues}
+                  </h3>
                 </div>
               </CardContent>
             </Card>
@@ -133,7 +216,9 @@ export default function IssueManagementPage() {
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <AlertCircle className="h-4 w-4 fill-red-500 text-red-500" />
-                  <h3 className="text-3xl font-bold text-red-600">1</h3>
+                  <h3 className="text-3xl font-bold text-red-600">
+                    {openIssues}
+                  </h3>
                 </div>
               </CardContent>
             </Card>
@@ -146,32 +231,82 @@ export default function IssueManagementPage() {
                 </p>
                 <div className="flex items-center gap-2 mt-2">
                   <PlayCircle className="h-4 w-4 fill-blue-500 text-blue-500" />
-                  <h3 className="text-3xl font-bold text-blue-600">2</h3>
+                  <h3 className="text-3xl font-bold text-blue-600">
+                    {progressIssues}
+                  </h3>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Perlu Eskalasi */}
+            {/* Selesai / Resolved */}
             <Card className="shadow-sm">
               <CardContent className="p-6">
                 <p className="text-sm font-medium text-slate-500">
-                  Perlu Eskalasi
+                  Selesai
                 </p>
                 <div className="flex items-center gap-2 mt-2">
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <h3 className="text-3xl font-bold text-red-600">1</h3>
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <h3 className="text-3xl font-bold text-green-600">
+                    {resolvedIssues}
+                  </h3>
                 </div>
               </CardContent>
             </Card>
           </div>
 
+          {/* --- FILTER SECTION --- */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Filter & Pencarian</CardTitle>
+              <CardDescription>
+                Cari isu berdasarkan judul atau program
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Cari judul isu..."
+                    className="pl-9"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+                <div className="w-full lg:w-[300px]">
+                  <Select
+                    value={selectedProgram}
+                    onValueChange={(val) => {
+                      setSelectedProgram(val);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Semua Program" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Program</SelectItem>
+                      {programs.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.reference}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* --- TABLE SECTION --- */}
           <Card>
             <CardHeader className="pb-3 border-b">
               <div className="flex items-center gap-2">
-                <div className="bg-slate-100 p-1.5 rounded-md">
-                  <TrendingUpIcon className="h-4 w-4 text-slate-600" />
-                </div>
+                <AlertTriangle className="h-5 w-5 text-slate-500" />
                 <CardTitle className="text-base">Daftar Isu</CardTitle>
               </div>
             </CardHeader>
@@ -180,143 +315,137 @@ export default function IssueManagementPage() {
                 <TableHeader className="bg-muted/30">
                   <TableRow>
                     <TableHead className="w-[250px] font-semibold">
-                      Program
+                      Program / Divisi
                     </TableHead>
                     <TableHead className="w-[350px] font-semibold">
                       Deskripsi Isu
                     </TableHead>
                     <TableHead className="font-semibold">
-                      Tanggal Terjadi
+                      Tanggal Identifikasi
                     </TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Due Date</TableHead>
                     <TableHead className="font-semibold">
-                      Tanggung Jawab
+                      Durasi (Hari)
                     </TableHead>
-                    <TableHead className="font-semibold">Durasi</TableHead>
                     <TableHead className="text-right font-semibold">
                       Aksi
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {issues.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-muted/30">
-                      <TableCell className="font-medium align-top py-4 text-sm">
-                        {item.program}
-                      </TableCell>
-                      <TableCell className="align-top py-4">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-sm text-slate-700">
-                            {item.description}
-                          </span>
-                          {item.note && (
-                            <span className="text-xs text-red-500 flex items-center gap-1 font-medium">
-                              <AlertTriangle className="h-3 w-3" /> {item.note}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground align-top py-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon className="h-3.5 w-3.5" />
-                          {item.tanggal}
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top py-4">
-                        <Badge
-                          variant="outline"
-                          className={`font-medium ${getStatusBadge(
-                            item.status
-                          )}`}
-                        >
-                          {item.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm font-medium align-top py-4 text-slate-700">
-                        {item.pic}
-                      </TableCell>
-                      <TableCell className="align-top py-4">
-                        <span className="text-sm text-amber-600 flex items-center gap-1 font-medium bg-amber-50 px-2 py-1 rounded w-fit">
-                          <Clock className="h-3.5 w-3.5" /> {item.durasi} hari
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right align-top py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-amber-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
-                            title="Eskalasi"
-                          >
-                            <AlertTriangle className="h-4 w-4" />
-                          </Button>
+                  {isLoading || isFetching ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        <div className="flex justify-center items-center gap-2">
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                          <span>Memuat data...</span>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : issues.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        Tidak ada data isu ditemukan.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    issues.map((item) => (
+                      <TableRow key={item.id} className="hover:bg-muted/30">
+                        <TableCell className="align-top py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-bold text-sm text-foreground">
+                              {item.program?.reference || "-"}
+                            </span>
+                            <span className="text-xs text-muted-foreground italic">
+                              {item.division?.name || "Divisi N/A"}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-top py-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-medium text-sm text-slate-900">
+                              {item.title}
+                            </span>
+                            <span className="text-sm text-slate-600 max-w-[300px] truncate">
+                              {item.description}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground align-top py-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            {formatDate(item.identified_at)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-top py-4">
+                          {getStatusBadge(item.status)}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium align-top py-4 text-slate-700">
+                          {formatDate(item.due_date)}
+                        </TableCell>
+                        <TableCell className="align-top py-4">
+                          <span className="text-sm text-amber-600 flex items-center gap-1 font-medium bg-amber-50 px-2 py-1 rounded w-fit">
+                            <Clock className="h-3.5 w-3.5" />{" "}
+                            {calculateDuration(item.created_at)} hari
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right align-top py-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-amber-600"
+                              onClick={() =>
+                                router.push(
+                                  `/management/isu/add-data?id=${item.id}`
+                                )
+                              }
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                              onClick={() => handleDelete(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
+
+          {/* --- Pagination --- */}
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((old) => Math.max(old - 1, 1))}
+              disabled={page === 1 || isLoading}
+            >
+              Previous
+            </Button>
+            <div className="text-sm text-muted-foreground">
+              Halaman {page} dari {lastPage}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((old) => (old < lastPage ? old + 1 : old))}
+              disabled={page === lastPage || isLoading}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </div>
     </>
-  );
-}
-
-// Icon Helper Components (Jika belum ada di library)
-function TrendingUpIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-      <polyline points="17 6 23 6 23 12" />
-    </svg>
-  );
-}
-
-function CalendarIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-      <line x1="16" x2="16" y1="2" y2="6" />
-      <line x1="8" x2="8" y1="2" y2="6" />
-      <line x1="3" x2="21" y1="10" y2="10" />
-    </svg>
   );
 }

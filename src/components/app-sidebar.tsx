@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  IconBuildingCommunity,
   IconCalendarStats,
   IconDashboard,
   IconDeviceDesktopCog,
@@ -67,6 +68,11 @@ const NAV_DATA = {
           title: "Manajemen Isu",
           url: "/management/isu",
           icon: IconSettingsUp,
+        },
+        {
+          title: "Manajemen Devisi",
+          url: "/management/devisi",
+          icon: IconBuildingCommunity,
         },
       ],
     },

@@ -7,7 +7,7 @@ import {
 } from "@/services/users.service";
 import { User, Role, CreateUserPayload } from "@/types/user";
 import Swal from "sweetalert2";
-import { Combobox } from "@/components/ui/combo-box";
+import { Combobox } from "@/components/ui/combobox";
 
 interface FormCreateUserProps {
   onClose: () => void;

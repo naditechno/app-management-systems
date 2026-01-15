@@ -16,7 +16,7 @@ import {
   useRegisterMutation,
   useForgotPasswordMutation,
 } from "@/services/auth.service";
-import { ApiError } from "@/lib/error-handle";
+import { ApiError } from "@/lib/error-utils";
 
 type ViewState = "login" | "register" | "forgot_password";
 

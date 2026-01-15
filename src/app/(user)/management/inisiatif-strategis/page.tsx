@@ -1,5 +1,17 @@
 "use client";
 
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import Swal from "sweetalert2";
+import { Pencil, Plus, Search, Trash2, Loader2, Target } from "lucide-react";
+
+// RTK Query Hooks
+import {
+  useGetStrategicInitiativesQuery,
+  useDeleteStrategicInitiativeMutation,
+} from "@/services/management/program-initiative.service";
+
+// Components
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,74 +39,59 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Eye, Pencil, Plus, Search, Trash2, Target } from "lucide-react";
-import { useRouter } from "next/navigation";
-
-// --- MOCK DATA ---
-const initiatives = [
-  {
-    id: 1,
-    title: "Digital Transformation Initiative",
-    description: "Modernizing IT infrastructure and digital processes...",
-    actionPlan: "System uptime 99.9%",
-    perspective: "Financial",
-    status: "On Track",
-    budget: 1000000,
-    progress: 75,
-    createdAt: "26/6/2025",
-  },
-  {
-    id: 2,
-    title: "Customer Experience Enhancement",
-    description: "Improving customer service channels and response...",
-    actionPlan: "Customer satisfaction score 4.5/5",
-    perspective: "Customer", // Diubah sedikit dari gambar agar variatif
-    status: "Delayed",
-    budget: 500000,
-    progress: 45,
-    createdAt: "26/6/2025",
-  },
-  {
-    id: 3,
-    title: "Process Automation Rollout",
-    description: "Automating manual reporting and data entry...",
-    actionPlan: "Reduce processing time by 30%",
-    perspective: "Internal Process",
-    status: "On Track",
-    budget: 350000,
-    progress: 60,
-    createdAt: "28/6/2025",
-  },
-  {
-    id: 4,
-    title: "Employee Skill Development",
-    description: "Training program for advanced data analytics...",
-    actionPlan: "100% staff certified",
-    perspective: "Learning & Growth",
-    status: "At Risk",
-    budget: 200000,
-    progress: 20,
-    createdAt: "30/6/2025",
-  },
-];
 
 export default function StrategicInitiativePage() {
-    const router = useRouter();
-  // Helper Warna Status
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "On Track":
-        return "bg-emerald-500 hover:bg-emerald-600 border-transparent text-white";
-      case "Delayed":
-        return "bg-yellow-500 hover:bg-yellow-600 border-transparent text-white";
-      case "At Risk":
-        return "bg-red-500 hover:bg-red-600 border-transparent text-white";
-      default:
-        return "bg-gray-500 text-white";
+  const router = useRouter();
+
+  // State
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("created_at");
+  const [perspectiveFilter, setPerspectiveFilter] = useState("all");
+
+  // Fetch Data
+  const {
+    data: initiativesData,
+    isLoading,
+    isFetching,
+  } = useGetStrategicInitiativesQuery({
+    page,
+    paginate: 10,
+    search,
+    sort_by: sortBy,
+  });
+
+  const [deleteInitiative] = useDeleteStrategicInitiativeMutation();
+
+  // Helper Variables
+  const initiatives = initiativesData?.data?.data || [];
+  const lastPage = initiativesData?.data?.last_page || 1;
+
+  // Handlers
+  const handleDelete = async (id: number) => {
+    const result = await Swal.fire({
+      title: "Apakah anda yakin?",
+      text: "Data yang dihapus tidak dapat dikembalikan!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteInitiative(id).unwrap();
+        Swal.fire("Terhapus!", "Inisiatif telah dihapus.", "success");
+      } catch (error) {
+        console.error(error);
+        Swal.fire("Gagal!", "Terjadi kesalahan saat menghapus.", "error");
+      }
     }
   };
 
-  // Helper Warna Perspektif (Untuk Badge & Border Card)
+  // Helper Format Perspective Color
   const getPerspectiveMeta = (perspective: string) => {
     switch (perspective) {
       case "Financial":
@@ -141,17 +138,42 @@ export default function StrategicInitiativePage() {
     }).format(value);
   };
 
-  // Data untuk Summary Cards di atas
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  // Data for Summary Cards
   const summaryCards = [
-    { title: "Financial", count: 2, perspective: "Financial" },
-    { title: "Customer", count: 1, perspective: "Customer" },
-    { title: "Internal Process", count: 3, perspective: "Internal Process" },
-    { title: "Learning & Growth", count: 1, perspective: "Learning & Growth" },
+    {
+      title: "Financial",
+      count: initiatives.filter((i) => i.perspective === "Financial").length,
+      perspective: "Financial",
+    },
+    {
+      title: "Customer",
+      count: initiatives.filter((i) => i.perspective === "Customer").length,
+      perspective: "Customer",
+    },
+    {
+      title: "Internal Process",
+      count: initiatives.filter((i) => i.perspective === "Internal Process")
+        .length,
+      perspective: "Internal Process",
+    },
+    {
+      title: "Learning & Growth",
+      count: initiatives.filter((i) => i.perspective === "Learning & Growth")
+        .length,
+      perspective: "Learning & Growth",
+    },
   ];
 
   return (
     <>
-      {/* Title Header akan otomatis memunculkan breadcrumb karena path sudah sesuai */}
       <SiteHeader title="Inisiatif Strategis" />
 
       <div className="flex flex-1 flex-col bg-muted/10 min-h-screen">
@@ -167,9 +189,9 @@ export default function StrategicInitiativePage() {
               </p>
             </div>
             <Button
-              onClick={() => {
-                router.push("/management/inisiatif-strategis/add-data");
-              }}
+              onClick={() =>
+                router.push("/management/inisiatif-strategis/add-data")
+              }
               className="bg-[#0F172A] hover:bg-[#1E293B] text-white"
             >
               <Plus className="mr-2 h-4 w-4" /> Tambah Inisiatif Baru
@@ -220,33 +242,43 @@ export default function StrategicInitiativePage() {
                     type="search"
                     placeholder="Cari berdasarkan nama inisiatif, isu strategis, atau action plan..."
                     className="pl-9"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setPage(1);
+                    }}
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
                   <div className="w-full sm:w-[200px]">
-                    <Select>
+                    <Select
+                      value={perspectiveFilter}
+                      onValueChange={setPerspectiveFilter}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Semua Perspective" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Semua Perspective</SelectItem>
-                        <SelectItem value="fin">Financial</SelectItem>
-                        <SelectItem value="cust">Customer</SelectItem>
-                        <SelectItem value="proc">Internal Process</SelectItem>
-                        <SelectItem value="learn">Learning & Growth</SelectItem>
+                        <SelectItem value="Financial">Financial</SelectItem>
+                        <SelectItem value="Customer">Customer</SelectItem>
+                        <SelectItem value="Internal Process">
+                          Internal Process
+                        </SelectItem>
+                        <SelectItem value="Learning & Growth">
+                          Learning & Growth
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="w-full sm:w-[200px]">
-                    <Select>
+                    <Select value={sortBy} onValueChange={setSortBy}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Semua Status" />
+                        <SelectValue placeholder="Urutkan" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua Status</SelectItem>
-                        <SelectItem value="ontrack">On Track</SelectItem>
-                        <SelectItem value="delayed">Delayed</SelectItem>
-                        <SelectItem value="atrisk">At Risk</SelectItem>
+                        <SelectItem value="created_at">Terbaru</SelectItem>
+                        <SelectItem value="budget">Anggaran</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -261,7 +293,8 @@ export default function StrategicInitiativePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">
-                    Daftar Inisiatif Strategis ({initiatives.length})
+                    Daftar Inisiatif Strategis (
+                    {initiativesData?.data?.total || 0})
                   </CardTitle>
                   <CardDescription>
                     Daftar semua inisiatif strategis dan project besar yang
@@ -271,104 +304,162 @@ export default function StrategicInitiativePage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="w-[50px] font-semibold">No</TableHead>
-                    <TableHead className="w-[300px] font-semibold">
-                      Inisiatif Strategis
-                    </TableHead>
-                    <TableHead className="font-semibold">Perspective</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold">Anggaran</TableHead>
-                    <TableHead className="w-[200px] font-semibold">
-                      Progress
-                    </TableHead>
-                    <TableHead className="font-semibold">Dibuat</TableHead>
-                    <TableHead className="text-right font-semibold">
-                      Aksi
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {initiatives.map((item, index) => (
-                    <TableRow key={item.id} className="hover:bg-muted/30">
-                      <TableCell className="font-medium">{index + 1}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <span className="font-bold text-sm text-foreground">
-                            {item.title}
-                          </span>
-                          <span className="text-xs text-muted-foreground line-clamp-1">
-                            {item.description}
-                          </span>
-                          <span className="text-xs text-muted-foreground/70 italic">
-                            Action Plan: {item.actionPlan}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={`font-medium ${
-                            getPerspectiveMeta(item.perspective).badge
-                          }`}
-                        >
-                          {item.perspective}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(item.status)}>
-                          {item.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium text-sm">
-                        {formatCurrency(item.budget)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Progress
-                            value={item.progress}
-                            className="h-2 w-full bg-blue-100 dark:bg-blue-900/30"
-                            indicatorClassName="bg-blue-600"
-                          />
-                          <span className="text-sm font-bold w-8">
-                            {item.progress}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.createdAt}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-blue-600"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-amber-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-[50px] font-semibold">
+                        No
+                      </TableHead>
+                      <TableHead className="w-[300px] font-semibold">
+                        Inisiatif Strategis
+                      </TableHead>
+                      <TableHead className="font-semibold">
+                        Perspective
+                      </TableHead>
+                      <TableHead className="font-semibold">Program</TableHead>
+                      <TableHead className="font-semibold">Anggaran</TableHead>
+                      <TableHead className="w-[200px] font-semibold">
+                        Progress
+                      </TableHead>
+                      <TableHead className="font-semibold">Dibuat</TableHead>
+                      <TableHead className="text-right font-semibold">
+                        Aksi
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading || isFetching ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="h-24 text-center">
+                          <div className="flex justify-center items-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                            <span>Memuat data...</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : initiatives.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="h-24 text-center">
+                          Tidak ada data ditemukan.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      initiatives
+                        .filter((item) =>
+                          perspectiveFilter === "all"
+                            ? true
+                            : item.perspective === perspectiveFilter
+                        )
+                        .map((item, index) => (
+                          <TableRow key={item.id} className="hover:bg-muted/30">
+                            <TableCell className="font-medium">
+                              {(page - 1) * 10 + index + 1}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <span className="font-bold text-sm text-foreground">
+                                  {item.strategy}
+                                </span>
+                                <span className="text-xs text-muted-foreground line-clamp-1">
+                                  {item.problem}
+                                </span>
+                                <span className="text-xs text-muted-foreground/70 italic">
+                                  Action Plan: {item.action_plan}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={`font-medium ${
+                                  getPerspectiveMeta(item.perspective).badge
+                                }`}
+                              >
+                                {item.perspective}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {item.program?.reference || "N/A"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">
+                              {formatCurrency(item.budget)}
+                              <span className="text-xs text-muted-foreground ml-1 uppercase">
+                                ({item.budget_type})
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Progress
+                                  value={item.progress}
+                                  className="h-2 w-full bg-blue-100 dark:bg-blue-900/30"
+                                  indicatorClassName="bg-blue-600"
+                                />
+                                <span className="text-sm font-bold w-8">
+                                  {item.progress}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatDate(item.created_at)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-amber-600"
+                                  onClick={() =>
+                                    router.push(
+                                      `/management/inisiatif-strategis/add-data?id=${item.id}`
+                                    )
+                                  }
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                                  onClick={() => handleDelete(item.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* --- Pagination --- */}
+              <div className="flex items-center justify-end space-x-2 py-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((old) => Math.max(old - 1, 1))}
+                  disabled={page === 1 || isLoading}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  Halaman {page} dari {lastPage}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setPage((old) => (old < lastPage ? old + 1 : old))
+                  }
+                  disabled={page === lastPage || isLoading}
+                >
+                  Next
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -22,11 +22,22 @@ import {
   ComposedChart,
 } from "recharts";
 
-const dataPie = [
-  { name: "Completed", value: 60, color: "#22c55e" }, // Green
-  { name: "Not Started", value: 18, color: "#64748b" }, // Slate
-  { name: "Drop", value: 5, color: "#ef4444" }, // Red
-  { name: "Carry Over", value: 9, color: "#a855f7" }, // Purple
+// --- Types ---
+// 1. Definisikan tipe data dasar
+interface PieChartEntry {
+  name: string;
+  value: number;
+  color: string;
+  // ✅ FIX: Tambahkan index signature agar kompatibel dengan ChartDataInput Recharts
+  [key: string]: string | number | undefined | object;
+}
+
+// --- Data ---
+const dataPie: PieChartEntry[] = [
+  { name: "Completed", value: 60, color: "#22c55e" },
+  { name: "Not Started", value: 18, color: "#64748b" },
+  { name: "Drop", value: 5, color: "#ef4444" },
+  { name: "Carry Over", value: 9, color: "#a855f7" },
 ];
 
 const dataTrend = [
@@ -39,6 +50,8 @@ const dataTrend = [
 ];
 
 export function DashboardCharts() {
+  const totalValue = dataPie.reduce((acc, curr) => acc + curr.value, 0);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Chart 1: Distribusi Status (Pie) */}
@@ -59,7 +72,7 @@ export function DashboardCharts() {
                   data={dataPie}
                   cx="50%"
                   cy="50%"
-                  innerRadius={0} // Pie Chart penuh (bukan Donut) sesuai gambar
+                  innerRadius={0}
                   outerRadius={100}
                   paddingAngle={0}
                   dataKey="value"
@@ -89,12 +102,20 @@ export function DashboardCharts() {
                   verticalAlign="middle"
                   align="right"
                   iconType="circle"
-                  formatter={(value, entry: any) => {
-                    const { payload } = entry;
-                    const percent = ((payload.value / 92) * 100).toFixed(0);
+                  // ✅ FIX: Typing formatter tanpa 'any'
+                  formatter={(value: string, entry: unknown) => {
+                    // Kita casting 'entry' ke struktur objek yang diharapkan Recharts (memiliki payload)
+                    const typedEntry = entry as { payload: PieChartEntry };
+                    const payloadValue = typedEntry.payload.value;
+
+                    const percent =
+                      totalValue > 0
+                        ? ((payloadValue / totalValue) * 100).toFixed(0)
+                        : "0";
+
                     return (
                       <span className="text-xs text-slate-600 ml-2">
-                        {value}: {payload.value} ({percent}%)
+                        {value}: {payloadValue} ({percent}%)
                       </span>
                     );
                   }}
@@ -156,7 +177,7 @@ export function DashboardCharts() {
                   verticalAlign="bottom"
                   height={36}
                   iconType="circle"
-                  formatter={(value) => (
+                  formatter={(value: string) => (
                     <span className="text-xs text-slate-600 font-medium">
                       {value}
                     </span>

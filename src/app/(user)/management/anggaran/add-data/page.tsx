@@ -9,21 +9,24 @@ import Swal from "sweetalert2";
 import {
   ArrowLeft,
   Save,
-  Target,
   Loader2,
   UploadCloud,
-  File as FileIcon,
-  X,
+  FileText,
   Eye,
+  X,
+  ExternalLink,
+  File as FileIcon,
+  ListTodo, // Icon untuk preview task
 } from "lucide-react";
 
 // Services
 import {
-  useCreateStrategicInitiativeMutation,
-  useUpdateStrategicInitiativeMutation,
-  useGetStrategicInitiativeByIdQuery,
-} from "@/services/management/program-initiative.service";
+  useCreateProgramTaskMutation,
+  useUpdateProgramTaskMutation,
+  useGetProgramTaskByIdQuery,
+} from "@/services/management/program-task.service";
 import { useGetProgramsQuery } from "@/services/management/program.service";
+import { useGetStrategicInitiativesQuery } from "@/services/management/program-initiative.service";
 
 // Components
 import { SiteHeader } from "@/components/site-header";
@@ -47,48 +50,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
-// Schema Validation
-const initiativeSchema = z.object({
-  program_id: z
-    .number({ required_error: "Program wajib dipilih" })
-    .min(1, "Program wajib dipilih"),
-  perspective: z.string().min(1, "Perspective wajib dipilih"),
-  problem: z.string().min(1, "Isu Strategis wajib diisi"),
-  strategy: z.string().min(1, "Inisiatif Strategis wajib diisi"),
-  action_plan: z.string().min(1, "Action Plan wajib diisi"),
-  budget_type: z.string().min(1, "Tipe Anggaran wajib dipilih"),
-  budget: z.coerce.number().min(0, "Anggaran tidak valid"),
+// --- VALIDATION SCHEMA ---
+const taskSchema = z.object({
+  program_id: z.number().min(1, "Program wajib dipilih"),
+  program_strategic_initiative_id: z
+    .number()
+    .min(1, "Inisiatif Strategis wajib dipilih"),
+  title: z.string().min(1, "Judul tugas wajib diisi"),
+  description: z.string().min(1, "Deskripsi wajib diisi"),
+  due_date: z.string().min(1, "Due date wajib diisi"),
+  status: z.string(),
   document: z.any().optional(),
 });
 
-type InitiativeFormValues = z.infer<typeof initiativeSchema>;
+type TaskFormValues = z.infer<typeof taskSchema>;
 
-export default function CreateInitiativePage() {
+export default function ProgramTaskFormPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
   const isEditing = !!id;
 
-  // State Preview File
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // RTK Query
-  const { data: programsData, isLoading: isLoadingPrograms } =
+  // --- RTK QUERY ---
+  // 1. Fetch Programs
+  const { data: programsData, isLoading: loadingPrograms } =
     useGetProgramsQuery({
       page: 1,
-      paginate: 100, // Load enough programs for dropdown
+      paginate: 100,
     });
 
-  const { data: existingData, isLoading: isLoadingData } =
-    useGetStrategicInitiativeByIdQuery(Number(id), { skip: !isEditing });
+  // 2. Fetch Tasks Data (Edit Mode)
+  const { data: existingData, isLoading: loadingData } =
+    useGetProgramTaskByIdQuery(Number(id), { skip: !isEditing });
 
-  const [createInitiative, { isLoading: isCreating }] =
-    useCreateStrategicInitiativeMutation();
-  const [updateInitiative, { isLoading: isUpdating }] =
-    useUpdateStrategicInitiativeMutation();
-
-  // Form Setup
+  // --- FORM SETUP ---
   const {
     register,
     handleSubmit,
@@ -97,26 +96,58 @@ export default function CreateInitiativePage() {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<InitiativeFormValues>({
-    resolver: zodResolver(initiativeSchema),
+  } = useForm<TaskFormValues>({
+    resolver: zodResolver(taskSchema),
     defaultValues: {
       program_id: 0,
-      perspective: "",
-      problem: "",
-      strategy: "",
-      action_plan: "",
-      budget_type: "opex",
-      budget: 0,
+      program_strategic_initiative_id: 0,
+      title: "",
+      description: "",
+      due_date: "",
+      status: "false", // Default Pending
       document: undefined,
     },
   });
 
+  const watchProgramId = watch("program_id");
   const watchDocument = watch("document");
-  const watchValues = watch();
-  const programs = programsData?.data?.data || [];
-  const selectedProgram = programs.find((p) => p.id === watchValues.program_id);
+  const watchValues = watch(); // Watch all values for preview
 
-  // Effect: Preview File Baru
+  // 3. Fetch Strategic Initiatives (Filtered by selected Program)
+  const { data: initiativesData, isLoading: loadingInitiatives } =
+    useGetStrategicInitiativesQuery(
+      {
+        page: 1,
+        paginate: 100,
+        program_id: watchProgramId ? watchProgramId : undefined,
+      },
+      { skip: !watchProgramId }
+    );
+
+  // Mutations
+  const [createTask, { isLoading: isCreating }] =
+    useCreateProgramTaskMutation();
+  const [updateTask, { isLoading: isUpdating }] =
+    useUpdateProgramTaskMutation();
+
+  // --- EFFECTS ---
+
+  // Populate Edit Data
+  useEffect(() => {
+    if (existingData?.data) {
+      const data = existingData.data;
+      reset({
+        program_id: data.program_id,
+        program_strategic_initiative_id: data.program_strategic_initiative_id,
+        title: data.title,
+        description: data.description,
+        status: data.status ? "true" : "false",
+        due_date: data.due_date ? data.due_date.split("T")[0] : "",
+      });
+    }
+  }, [existingData, reset]);
+
+  // Preview File
   useEffect(() => {
     if (watchDocument instanceof File) {
       const url = URL.createObjectURL(watchDocument);
@@ -127,66 +158,61 @@ export default function CreateInitiativePage() {
     }
   }, [watchDocument]);
 
-  // Effect: Populate Data Edit
-  useEffect(() => {
-    if (existingData?.data) {
-      const data = existingData.data;
-      reset({
-        program_id: data.program_id,
-        perspective: data.perspective,
-        problem: data.problem,
-        strategy: data.strategy,
-        action_plan: data.action_plan,
-        budget_type: data.budget_type,
-        budget: data.budget,
-        document: undefined, // File tidak di-set ke input file
-      });
-    }
-  }, [existingData, reset]);
-
-  // Submit Handler
-  const onSubmit: SubmitHandler<InitiativeFormValues> = async (values) => {
+  // --- SUBMIT ---
+  const onSubmit: SubmitHandler<TaskFormValues> = async (values) => {
     try {
       const formData = new FormData();
       formData.append("program_id", String(values.program_id));
-      formData.append("perspective", values.perspective);
-      formData.append("problem", values.problem);
-      formData.append("strategy", values.strategy);
-      formData.append("action_plan", values.action_plan);
-      formData.append("budget_type", values.budget_type);
-      formData.append("budget", String(values.budget));
+      formData.append(
+        "program_strategic_initiative_id",
+        String(values.program_strategic_initiative_id)
+      );
+      formData.append("title", values.title);
+      formData.append("description", values.description);
+      formData.append("due_date", values.due_date);
+      formData.append("status", values.status === "true" ? "1" : "0");
 
       if (values.document instanceof File) {
         formData.append("document", values.document);
       }
 
       if (isEditing) {
-        await updateInitiative({
+        await updateTask({
           id: Number(id),
           payload: formData,
         }).unwrap();
-        Swal.fire("Berhasil", "Inisiatif berhasil diperbarui", "success");
+        Swal.fire("Berhasil", "Tugas berhasil diperbarui", "success");
       } else {
-        await createInitiative(formData).unwrap();
-        Swal.fire("Berhasil", "Inisiatif berhasil dibuat", "success");
+        await createTask(formData).unwrap();
+        Swal.fire("Berhasil", "Tugas berhasil dibuat", "success");
       }
-      router.push("/management/inisiatif-strategis");
+      router.push("/management/anggaran");
     } catch (error) {
       console.error(error);
-      Swal.fire("Gagal", "Terjadi kesalahan saat menyimpan data", "error");
+      Swal.fire("Gagal", "Terjadi kesalahan saat menyimpan", "error");
     }
   };
 
-  const formatCurrency = (value: number | string) => {
-    const num = Number(value) || 0;
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      maximumFractionDigits: 0,
-    }).format(num);
+  const programs = programsData?.data?.data || [];
+  const initiatives = initiativesData?.data?.data || [];
+
+  // Helper for Preview Lookup
+  const selectedProgram = programs.find((p) => p.id === watchValues.program_id);
+  const selectedInitiative = initiatives.find(
+    (i) => i.id === watchValues.program_strategic_initiative_id
+  );
+
+  // Helper size
+  const formatBytes = (bytes: number) => {
+    if (!+bytes) return "0 Bytes";
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${
+      ["Bytes", "KB", "MB", "GB"][i]
+    }`;
   };
 
-  if (isEditing && isLoadingData) {
+  if (isEditing && loadingData) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -196,11 +222,10 @@ export default function CreateInitiativePage() {
 
   return (
     <>
-      <SiteHeader title={isEditing ? "Edit Inisiatif" : "Input Inisiatif"} />
+      <SiteHeader title={isEditing ? "Edit Tugas" : "Input Tugas"} />
 
       <div className="flex flex-1 flex-col bg-muted/10 min-h-screen pb-10">
         <div className="flex flex-col gap-6 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
-          {/* --- TOP BAR --- */}
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
@@ -212,38 +237,30 @@ export default function CreateInitiativePage() {
             </Button>
             <div>
               <h1 className="text-xl font-bold tracking-tight">
-                {isEditing
-                  ? "Edit Inisiatif Strategis"
-                  : "Input Inisiatif Strategis"}
+                {isEditing ? "Edit Tugas Program" : "Input Tugas Program"}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {isEditing
-                  ? "Perbarui data inisiatif strategis"
-                  : "Tambahkan inisiatif strategis atau project besar baru"}
+                Lengkapi form di bawah ini
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* --- FORM INPUT (KIRI) --- */}
+            {/* --- LEFT COLUMN: Form --- */}
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" /> Form Input Inisiatif
+                    <FileText className="h-5 w-5" /> Form Detail Tugas
                   </CardTitle>
-                  <CardDescription>
-                    Lengkapi semua field yang diperlukan
-                  </CardDescription>
+                  <CardDescription>Informasi tugas dan target</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-                    {/* 1. Informasi Dasar */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Informasi Dasar</h3>
-
+                      {/* Program Select */}
                       <div className="space-y-2">
-                        <Label>Program Referensi *</Label>
+                        <Label>Program *</Label>
                         <Controller
                           name="program_id"
                           control={control}
@@ -251,12 +268,13 @@ export default function CreateInitiativePage() {
                             <Combobox
                               data={programs}
                               value={field.value}
-                              onChange={field.onChange}
-                              isLoading={isLoadingPrograms}
-                              placeholder="Pilih Program Kerja"
-                              getOptionLabel={(item) =>
-                                `${item.reference} - ${item.action_plan}`
-                              }
+                              onChange={(val) => {
+                                field.onChange(val);
+                                setValue("program_strategic_initiative_id", 0);
+                              }}
+                              isLoading={loadingPrograms}
+                              placeholder="Pilih Program"
+                              getOptionLabel={(item) => item.reference}
                             />
                           )}
                         />
@@ -267,121 +285,81 @@ export default function CreateInitiativePage() {
                         )}
                       </div>
 
+                      {/* Initiative Select (Dependent) */}
                       <div className="space-y-2">
-                        <Label htmlFor="perspective">Perspective *</Label>
+                        <Label>Inisiatif Strategis *</Label>
                         <Controller
-                          name="perspective"
+                          name="program_strategic_initiative_id"
                           control={control}
                           render={({ field }) => (
-                            <Select
-                              onValueChange={field.onChange}
+                            <Combobox
+                              data={initiatives}
                               value={field.value}
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Pilih perspective" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Financial">
-                                  Financial
-                                </SelectItem>
-                                <SelectItem value="Customer">
-                                  Customer
-                                </SelectItem>
-                                <SelectItem value="Internal Process">
-                                  Internal Process
-                                </SelectItem>
-                                <SelectItem value="Learning & Growth">
-                                  Learning & Growth
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                              onChange={field.onChange}
+                              isLoading={loadingInitiatives}
+                              placeholder={
+                                watchProgramId
+                                  ? "Pilih Inisiatif"
+                                  : "Pilih Program Terlebih Dahulu"
+                              }
+                              disabled={!watchProgramId}
+                              getOptionLabel={(item) =>
+                                item.strategy || `ID: ${item.id}`
+                              }
+                            />
                           )}
                         />
-                        {errors.perspective && (
+                        {errors.program_strategic_initiative_id && (
                           <p className="text-xs text-red-500">
-                            {errors.perspective.message}
+                            {errors.program_strategic_initiative_id.message}
                           </p>
                         )}
                       </div>
-                    </div>
 
-                    <Separator />
+                      <Separator />
 
-                    {/* 2. Isu & Masalah Strategis */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">
-                        Isu & Masalah Strategis
-                      </h3>
+                      {/* Title & Desc */}
                       <div className="space-y-2">
-                        <Label htmlFor="problem">Isu/Masalah Strategis *</Label>
+                        <Label>Judul Tugas *</Label>
+                        <Input
+                          placeholder="Contoh: Penyusunan Laporan..."
+                          {...register("title")}
+                        />
+                        {errors.title && (
+                          <p className="text-xs text-red-500">
+                            {errors.title.message}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Deskripsi *</Label>
                         <Textarea
-                          id="problem"
-                          placeholder="Jelaskan isu atau masalah strategis..."
+                          placeholder="Detail pekerjaan..."
                           className="min-h-[100px]"
-                          {...register("problem")}
+                          {...register("description")}
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Contoh: Tingkat kepuasan pelanggan masih rendah,
-                          efisiensi operasional perlu ditingkatkan.
-                        </p>
-                        {errors.problem && (
+                        {errors.description && (
                           <p className="text-xs text-red-500">
-                            {errors.problem.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* 3. Inisiatif Strategis */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">
-                        Inisiatif Strategis
-                      </h3>
-                      <div className="space-y-2">
-                        <Label htmlFor="strategy">Inisiatif Strategis *</Label>
-                        <Textarea
-                          id="strategy"
-                          placeholder="Jelaskan inisiatif strategis..."
-                          className="min-h-[100px]"
-                          {...register("strategy")}
-                        />
-                        {errors.strategy && (
-                          <p className="text-xs text-red-500">
-                            {errors.strategy.message}
+                            {errors.description.message}
                           </p>
                         )}
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="action_plan">Action Plan *</Label>
-                        <Textarea
-                          id="action_plan"
-                          placeholder="Rencana aksi detail..."
-                          className="min-h-[80px]"
-                          {...register("action_plan")}
-                        />
-                        {errors.action_plan && (
-                          <p className="text-xs text-red-500">
-                            {errors.action_plan.message}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* 4. Anggaran & Dokumen */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">
-                        Anggaran & Dokumen
-                      </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Tipe Anggaran *</Label>
+                          <Label>Due Date *</Label>
+                          <Input type="date" {...register("due_date")} />
+                          {errors.due_date && (
+                            <p className="text-xs text-red-500">
+                              {errors.due_date.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Status</Label>
                           <Controller
-                            name="budget_type"
+                            name="status"
                             control={control}
                             render={({ field }) => (
                               <Select
@@ -389,39 +367,23 @@ export default function CreateInitiativePage() {
                                 value={field.value}
                               >
                                 <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Pilih Tipe" />
+                                  <SelectValue placeholder="Pilih Status" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="opex">Opex</SelectItem>
-                                  <SelectItem value="capex">Capex</SelectItem>
+                                  <SelectItem value="false">Pending</SelectItem>
+                                  <SelectItem value="true">
+                                    Completed
+                                  </SelectItem>
                                 </SelectContent>
                               </Select>
                             )}
                           />
-                          {errors.budget_type && (
-                            <p className="text-xs text-red-500">
-                              {errors.budget_type.message}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="budget">Nilai Anggaran (Rp) *</Label>
-                          <Input
-                            id="budget"
-                            type="number"
-                            placeholder="0"
-                            {...register("budget")}
-                          />
-                          {errors.budget && (
-                            <p className="text-xs text-red-500">
-                              {errors.budget.message}
-                            </p>
-                          )}
                         </div>
                       </div>
 
+                      {/* File Upload */}
                       <div className="space-y-2">
-                        <Label>Upload Dokumen Pendukung</Label>
+                        <Label>Dokumen Pendukung</Label>
                         {!watchDocument || !(watchDocument instanceof File) ? (
                           <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-muted/10 transition cursor-pointer relative">
                             <input
@@ -434,22 +396,21 @@ export default function CreateInitiativePage() {
                             />
                             <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
                             <p className="text-sm font-medium">
-                              Klik atau drag & drop file
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              PDF, DOCX, XLSX (Max 5MB)
+                              Upload File (PDF/Docs/Image)
                             </p>
                           </div>
                         ) : (
-                          // PREVIEW NEW FILE
                           <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className="h-10 w-10 rounded bg-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded bg-blue-100 flex items-center justify-center text-blue-600">
                                 <FileIcon className="h-5 w-5" />
                               </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">
+                              <div>
+                                <p className="text-sm font-medium truncate max-w-[200px]">
                                   {watchDocument.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatBytes(watchDocument.size)}
                                 </p>
                               </div>
                             </div>
@@ -459,7 +420,7 @@ export default function CreateInitiativePage() {
                                   <a
                                     href={previewUrl}
                                     target="_blank"
-                                    rel="noopener noreferrer"
+                                    rel="noreferrer"
                                   >
                                     <Eye className="h-4 w-4 text-blue-600" />
                                   </a>
@@ -477,7 +438,6 @@ export default function CreateInitiativePage() {
                           </div>
                         )}
 
-                        {/* PREVIEW EXISTING FILE */}
                         {isEditing &&
                           existingData?.data?.document &&
                           !watchDocument && (
@@ -485,7 +445,7 @@ export default function CreateInitiativePage() {
                               <div className="flex items-center gap-2">
                                 <FileIcon className="h-4 w-4 text-green-600" />
                                 <span className="text-sm text-green-800 truncate max-w-[200px]">
-                                  {existingData.data.document.split("/").pop()}
+                                  File Tersimpan
                                 </span>
                               </div>
                               <Button
@@ -497,9 +457,9 @@ export default function CreateInitiativePage() {
                                 <a
                                   href={existingData.data.document}
                                   target="_blank"
-                                  rel="noopener noreferrer"
+                                  rel="noreferrer"
                                 >
-                                  <Eye className="h-4 w-4" /> Lihat
+                                  <ExternalLink className="h-4 w-4" /> Lihat
                                 </a>
                               </Button>
                             </div>
@@ -516,7 +476,7 @@ export default function CreateInitiativePage() {
                         {(isCreating || isUpdating) && (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         )}
-                        <Save className="mr-2 h-4 w-4" /> Simpan Inisiatif
+                        <Save className="mr-2 h-4 w-4" /> Simpan Tugas
                       </Button>
                     </div>
                   </form>
@@ -524,12 +484,12 @@ export default function CreateInitiativePage() {
               </Card>
             </div>
 
-            {/* --- PRATINJAU TEMPLATE (KANAN) --- */}
+            {/* --- RIGHT COLUMN: Preview --- */}
             <div className="lg:col-span-1">
               <Card className="sticky top-24">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Target className="h-4 w-4 text-muted-foreground" />
+                    <ListTodo className="h-4 w-4 text-muted-foreground" />
                     Pratinjau Template
                   </CardTitle>
                   <CardDescription>
@@ -548,32 +508,12 @@ export default function CreateInitiativePage() {
 
                   <div>
                     <span className="font-semibold block text-muted-foreground text-xs mb-1">
-                      Perspective:
-                    </span>
-                    {watchValues.perspective ? (
-                      <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold bg-primary/10 text-primary">
-                        {watchValues.perspective}
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </div>
-
-                  <div>
-                    <span className="font-semibold block text-muted-foreground text-xs mb-1">
-                      Isu Strategis:
-                    </span>
-                    <p className="font-medium text-justify line-clamp-3">
-                      {watchValues.problem || "-"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="font-semibold block text-muted-foreground text-xs mb-1">
                       Inisiatif Strategis:
                     </span>
-                    <p className="font-medium text-justify line-clamp-3">
-                      {watchValues.strategy || "-"}
+                    <p className="font-medium text-xs line-clamp-3">
+                      {selectedInitiative
+                        ? `${selectedInitiative.strategy}`
+                        : "-"}
                     </p>
                   </div>
 
@@ -581,21 +521,52 @@ export default function CreateInitiativePage() {
 
                   <div>
                     <span className="font-semibold block text-muted-foreground text-xs mb-1">
-                      Anggaran:
+                      Judul Tugas:
                     </span>
-                    <p className="text-lg font-bold text-green-600">
-                      {formatCurrency(watchValues.budget)}
-                      <span className="text-xs font-normal text-muted-foreground ml-1 uppercase">
-                        ({watchValues.budget_type})
-                      </span>
+                    <p className="font-medium text-sm">
+                      {watchValues.title || "-"}
                     </p>
+                  </div>
+
+                  <div>
+                    <span className="font-semibold block text-muted-foreground text-xs mb-1">
+                      Deskripsi:
+                    </span>
+                    <p className="font-medium text-xs text-justify line-clamp-4">
+                      {watchValues.description || "-"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="font-semibold block text-muted-foreground text-xs mb-1">
+                        Due Date:
+                      </span>
+                      <p className="font-medium">
+                        {watchValues.due_date || "-"}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-semibold block text-muted-foreground text-xs mb-1">
+                        Status:
+                      </span>
+                      {watchValues.status === "true" ? (
+                        <Badge className="bg-emerald-500 hover:bg-emerald-600 text-[10px] px-2 py-0">
+                          Completed
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-500 hover:bg-amber-600 text-[10px] px-2 py-0">
+                          Pending
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   <div>
                     <span className="font-semibold block text-muted-foreground text-xs mb-1">
                       Dokumen:
                     </span>
-                    <p className="font-medium italic text-muted-foreground">
+                    <p className="font-medium italic text-muted-foreground text-xs">
                       {watchValues.document instanceof File
                         ? `File Baru: ${watchValues.document.name}`
                         : isEditing && existingData?.data?.document
